@@ -1,0 +1,152 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ShopCategory {
+  GENERAL_STORE
+  CLOTH
+  COSMETICS
+  OTHER
+}
+
+enum UnitType {
+  PIECE
+  KG
+  GRAM
+  LITER
+  ML
+  DOZEN
+  LOT
+  QUINTAL
+  BAG
+  TEN_PIECE
+}
+
+enum SyncStatus {
+  SYNCED
+  PENDING
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CREDIT
+  OTHER
+}
+
+enum Role {
+  SHOP_OWNER
+  ADMIN
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@map("admins")
+}
+
+model Shop {
+  id           String       @id @default(uuid())
+  ownerName    String
+  shopName     String
+  phoneNumber  String       @unique
+  passwordHash String
+  shopCategory ShopCategory @default(GENERAL_STORE)
+  address      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  products Product[]
+  sales    Sale[]
+
+  @@index([phoneNumber])
+  @@map("shops")
+}
+
+model Product {
+  id           String    @id @default(uuid())
+  shopId       String
+  name         String
+  category     String?
+  unitType     UnitType  @default(PIECE)
+  pricePerUnit Float
+  barcodeValue String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  stock     Stock?
+  saleItems SaleItem[]
+
+  @@unique([shopId, barcodeValue])
+  @@index([shopId])
+  @@index([barcodeValue])
+  @@map("products")
+}
+
+model Stock {
+  id                String   @id @default(uuid())
+  productId         String   @unique
+  quantity          Float    @default(0)
+  lowStockThreshold Float    @default(5)
+  lastUpdatedAt     DateTime @default(now()) @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("stocks")
+}
+
+model Sale {
+  id                String      @id @default(uuid())
+  shopId            String
+  totalAmount       Float
+  paymentMode       PaymentMode @default(CASH)
+  syncStatus        SyncStatus  @default(SYNCED)
+  clientGeneratedId String      @unique
+  createdAt         DateTime    @default(now())
+
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  saleItems SaleItem[]
+
+  @@index([shopId])
+  @@index([clientGeneratedId])
+  @@index([createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id               String @id @default(uuid())
+  saleId           String
+  productId        String
+  quantity         Float
+  unitPriceAtSale  Float
+  subtotal         Float
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
+}
+
+model OtpRequest {
+  id          String   @id @default(uuid())
+  phoneNumber String
+  otpHash     String
+  expiresAt   DateTime
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([phoneNumber])
+  @@map("otp_requests")
+}
